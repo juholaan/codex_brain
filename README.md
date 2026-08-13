@@ -4,6 +4,16 @@ A Codex-native port of
 [Mycelium AI's AI Brain Starter](https://github.com/mycelium-hq/ai-brain-starter):
 an interactive system for building and operating an Obsidian second brain.
 
+## Upstream credit
+
+This project is derived from
+[mycelium-hq/ai-brain-starter](https://github.com/mycelium-hq/ai-brain-starter)
+by **Mycelium AI**. It retains the upstream project's MIT license and preserves
+the original README, setup skill, tests, and GitHub automation under
+[`docs/upstream/`](docs/upstream/) for attribution and comparison. Codex Brain
+Starter adapts the active plugin, skills, hooks, installer, and CI surfaces for
+Codex; it is not an official Mycelium AI release.
+
 This distribution keeps the upstream journaling, meeting, insight, knowledge
 graph, health, and team workflows while replacing the active Codex surfaces
 with Codex equivalents:
