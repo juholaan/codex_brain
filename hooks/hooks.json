@@ -1,0 +1,96 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py SessionStart",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" SessionStart",
+            "statusMessage": "Loading second-brain context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py UserPromptSubmit",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" UserPromptSubmit",
+            "statusMessage": "Checking brain routing"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py PreToolUse shell",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" PreToolUse shell"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py PreToolUse write",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" PreToolUse write"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py PreToolUse observe",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" PreToolUse observe"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|Agent|Task|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py PostToolUse",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" PostToolUse"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py PreCompact",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" PreCompact",
+            "statusMessage": "Preserving brain context"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/codex_runtime.py Stop",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\codex_runtime.py\" Stop",
+            "statusMessage": "Checking session close"
+          }
+        ]
+      }
+    ]
+  }
+}

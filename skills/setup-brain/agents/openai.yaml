@@ -1,0 +1,6 @@
+interface:
+  display_name: "Set Up Second Brain"
+  short_description: "Build or upgrade an Obsidian second brain"
+  default_prompt: "Use $setup-brain to set up or upgrade my Obsidian second brain with Codex."
+policy:
+  allow_implicit_invocation: true

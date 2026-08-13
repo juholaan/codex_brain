@@ -1,0 +1,371 @@
+{
+  "_comment": "AI Brain Starter — Hook Templates. Run /setup-brain to install these, or apply manually via: claude config edit --add hooks <paste contents here>. After git pull, re-run setup or re-apply to get updated hooks.",
+  "_paths_note": "The [VAULT_PATH] placeholder gets substituted with the user's actual vault path by /setup-brain. All Meta references use '⚙️ Meta/' with the emoji prefix, matching Phase 3's canonical folder structure. Do NOT remove the emoji — the bash scripts and hook contexts look for that exact folder name.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] '[VAULT_PATH]/plugins/codex-brain-starter/hooks/detect-closing-signal.py' 2>/dev/null || [PYTHON] ~/plugins/codex-brain-starter/hooks/detect-closing-signal.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking for session close..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-vault-session-in-worktree.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Vault-in-worktree tripwire (per-turn catch)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/log-skill-usage.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Logging skill usage (opt-in)..."
+          },
+          {
+            "type": "command",
+            "command": "bash '[VAULT_PATH]/⚙️ Meta/scripts/graph-context-hook.sh'",
+            "statusMessage": "Checking graph routing..."
+          },
+          {
+            "type": "command",
+            "command": "[ -f ~/.codex/hooks/vault-context.py ] && [PYTHON] ~/.codex/hooks/vault-context.py || true",
+            "statusMessage": "Loading vault context..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/inject-love-language-context.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking CRM for love language context..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/inject-meeting-workflow-on-trigger.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking for 'I just had a meeting' trigger..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/scripts/post-update-email-ask.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking for post-update email ask..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/scripts/ai-brain-auto-update.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking for skill updates..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/snapshot-pending-work-on-stop.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Snapshotting worktree pending work (recovery safety net)..."
+          },
+          {
+            "type": "command",
+            "command": "bash '[VAULT_PATH]/⚙️ Meta/scripts/session-end-hook.sh'",
+            "statusMessage": "Saving session context..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/coach-auto-prescribe-on-journal.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Coach auto-prescribe (post-journal, idempotent)..."
+          },
+          {
+            "_comment": "Hard-block gate, but FAIL-SAFE: enforcement is conditional on the session-close cascade being installed (<meta>/scripts/session-close-runner.sh). No runner -> advisory only, never blocks. Wired with an if/then/else (NOT '|| echo') so a real block (exit 2) propagates instead of being masked to 0; the [ -f ] guard passes cleanly if the script is missing on a divergent fork. Overrides: VERIFY_CASCADE_BYPASS=1 (skip), VERIFY_CASCADE_SOFT=1 (advisory).",
+            "type": "command",
+            "command": "if [ -f ~/plugins/codex-brain-starter/hooks/verify-session-close-cascade.py ]; then [PYTHON] ~/plugins/codex-brain-starter/hooks/verify-session-close-cascade.py; else echo '{\"continue\":true,\"suppressOutput\":true}'; fi",
+            "statusMessage": "Verifying session-close cascade (advisory unless the cascade is installed)..."
+          },
+          {
+            "_comment": "Anti-fabrication family. Blocks a close that asserts a verification result (deploy / HTTP status / commit / push / PR opened-or-merged) with no tool call in the session that sourced it from the system of record, or that names a hook/rule as having fired when that name is in no tool error. Wired if/then/else (NOT '|| echo') so a real block (the JSON decision) reaches Codex instead of being masked. Bypass: FAB_VERIFY_CHECK_BYPASS=1 / FAB_HOOK_CHECK_BYPASS=1.",
+            "type": "command",
+            "command": "if [ -f ~/plugins/codex-brain-starter/hooks/check-fabricated-verification.py ]; then [PYTHON] ~/plugins/codex-brain-starter/hooks/check-fabricated-verification.py; else echo '{\"continue\":true,\"suppressOutput\":true}'; fi",
+            "statusMessage": "Checking closing claims against tool evidence..."
+          },
+          {
+            "type": "command",
+            "command": "if [ -f ~/plugins/codex-brain-starter/hooks/check-fabricated-hook-attribution.py ]; then [PYTHON] ~/plugins/codex-brain-starter/hooks/check-fabricated-hook-attribution.py; else echo '{\"continue\":true,\"suppressOutput\":true}'; fi",
+            "statusMessage": "Checking hook attributions against fire evidence..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/pre-compact-context.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Preserving session context before compaction..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f ~/.codex/hooks/retry-budget.py ] && [PYTHON] ~/.codex/hooks/retry-budget.py || true"
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-vault-session-in-worktree.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'"
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-journal-saved-without-context.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'"
+          },
+          {
+            "_comment": "Warn-only. One Bash call chaining git commit/push, gh pr create/merge or gh release after '&&' AND piping to tail/head: '&&' short-circuits, so a truncated tail shows the FAILING step's error text while the agent infers the earlier steps landed. Bypass: CHAINED_STATE_CMD_BYPASS=1.",
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-chained-state-command-truncated.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'"
+          },
+          {
+            "_comment": "BLOCKING gate (CONCURRENT-SESSION-HEAD-DRIFT). From a worktree-rooted session, blocks `cd`/`pushd` into the MAIN checkout, which shares one .git/HEAD with every other main-checkout session. No-op unless cwd matches <main>/.codex/worktrees/<slug>. Wired in the `if [ -f ]` form on purpose: this hook signals by EXIT CODE 2 and writes its remediation prose to STDERR, so the usual `<script> 2>/dev/null || echo <allow>` idiom would discard the message AND convert the block into an allow. Bypass: WORKTREE_CD_BYPASS=1.",
+            "type": "command",
+            "command": "if [ -f ~/plugins/codex-brain-starter/hooks/check-cd-outside-worktree.py ]; then [PYTHON] ~/plugins/codex-brain-starter/hooks/check-cd-outside-worktree.py; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'; fi"
+          },
+          {
+            "_comment": "BLOCKING gate (GIT-MUTATION-INTO-IN-FLIGHT-OPERATION). Refuses a git-mutating command when the TARGET repo has an operation already in flight: rebase-merge/, rebase-apply/, MERGE_HEAD, CHERRY_PICK_HEAD, REVERT_HEAD, BISECT_LOG in the resolved git-dir. Pure git-STATE check, deliberately independent of session liveness: session-lock.py gates the rebase VERB while a sibling is live, but an ABANDONED rebase is indistinguishable from 'no session' to any heartbeat check. Incident 2026-07-28: a rebase stalled 22+ hours, ~22 commits landed on its detached HEAD, and six commits from four sessions fell off main. Costs one substring test on non-git calls; resolves the git-dir only when a mutating verb is present. Resolution verbs (--abort/--continue/--skip/--quit), `git tag` and `git branch` stay ALLOWED on purpose - blocking them would trap the repo and make the bypass the only exit. Same `if [ -f ]` form as the gate above and for the same reason: it signals by EXIT CODE 2 with its prose on STDERR, so the `2>/dev/null || echo <allow>` idiom would discard the message AND convert the block into an allow. Bypass: GIT_INFLIGHT_OP_BYPASS=1.",
+            "type": "command",
+            "command": "if [ -f ~/plugins/codex-brain-starter/hooks/block-git-mutation-mid-operation.py ]; then [PYTHON] ~/plugins/codex-brain-starter/hooks/block-git-mutation-mid-operation.py; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'; fi"
+          },
+          {
+            "_comment": "BLOCKING gate (MCP-SECRET-LEAK-VIA-ARGV). Blocks `codex mcp add ... --env NAME=<secret>`: every Codex child spawn carries the full MCP config via `--mcp-config '<json>'` argv, so `ps aux` / `pgrep -fl` / `lsof` on the running claude process dumps the secret in plaintext. Past incident: 2026-05-19 github-mcp PAT leaked via `pgrep -fl chrome-devtools-mcp`. Same `if [ -f ]` form as the two gates above and for the same reason: it signals by EXIT CODE 2 with its remediation prose on STDERR, so the `2>/dev/null || echo <allow>` idiom would discard the message AND convert the block into an allow. Bypass: MCP_INLINE_SECRET_BYPASS=1.",
+            "type": "command",
+            "command": "if [ -f ~/plugins/codex-brain-starter/hooks/block-codex-mcp-inline-secret.py ]; then [PYTHON] ~/plugins/codex-brain-starter/hooks/block-codex-mcp-inline-secret.py; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f ~/.codex/hooks/validate-mcp-json.py ] && [PYTHON] ~/.codex/hooks/validate-mcp-json.py || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'"
+          },
+          {
+            "type": "command",
+            "command": "[ -f ~/.codex/hooks/pre-write-settings-lint.py ] && [PYTHON] ~/.codex/hooks/pre-write-settings-lint.py || true"
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/lint-vault-frontmatter.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'"
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/validate-skill-frontmatter.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'",
+            "statusMessage": "Validating skill frontmatter (skill.json schema)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/block-secret-in-note.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'",
+            "statusMessage": "Checking for live secrets in note writes..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/validate-handoff-frontmatter.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'",
+            "statusMessage": "Checking handoff files declare consumes_when..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/block-populated-public-skill.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'",
+            "statusMessage": "Checking template purity (populated data in a public skill)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-learning-to-tool-private-memory.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'",
+            "statusMessage": "Checking memory routing (team learning vs tool-private)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-workflow-call-permission-elevation.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'",
+            "statusMessage": "Checking reusable-workflow permissions (callee cannot exceed caller)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-journal-saved-without-context.py 2>/dev/null || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'"
+          },
+          {
+            "_comment": "BLOCKING gate (MCP-SECRET-LEAK-VIA-CONFIG-FILE). Blocks a Write/Edit/MultiEdit to an MCP config file (~/.codex.json, **/.mcp.json, .claude/settings*.json) whose new content contains a secret-shaped value. Closes the direct-file-edit gap block-codex-mcp-inline-secret.py cannot see (that one only catches `codex mcp add` Bash commands). Past incidents: 2026-05-19 + 2026-05-23 github PAT leaks via this exact path. Wired in the `if [ -f ]` form for the same reason as the Bash-matcher blocking gates above: it signals by EXIT CODE 2 with its remediation prose on STDERR, so the `2>/dev/null || echo <allow>` idiom would discard the message AND convert the block into an allow. Bypass: MCP_CONFIG_SECRET_BYPASS=1.",
+            "type": "command",
+            "command": "if [ -f ~/plugins/codex-brain-starter/hooks/block-mcp-config-inline-secret.py ]; then [PYTHON] ~/plugins/codex-brain-starter/hooks/block-mcp-config-inline-secret.py; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Glob|Grep|Task|Agent|Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/observe-tool-calls.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/observe-tool-calls.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-stale-dev-checkout.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/session-start-context.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Loading session context (once per session-segment; cached prefix)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/inject-instinct-context.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Loading project-scoped instincts (once per session-segment; cached prefix)..."
+          },
+          {
+            "type": "command",
+            "command": "[ -f ~/.codex/hooks/lint-claude-settings.py ] && [PYTHON] ~/.codex/hooks/lint-claude-settings.py || true",
+            "statusMessage": "Linting Codex settings..."
+          },
+          {
+            "type": "command",
+            "command": "[ -f ~/.codex/hooks/lint-claude-settings.py ] && [PYTHON] ~/.codex/hooks/lint-claude-settings.py --test || true",
+            "statusMessage": "Self-testing settings linter..."
+          },
+          {
+            "type": "command",
+            "command": "[ -f ~/.codex/hooks/check-claude-code-version.sh ] && bash ~/.codex/hooks/check-claude-code-version.sh || true",
+            "statusMessage": "Checking Codex version..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/first-week-checkin.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "First-week check-in (day 3 / 7 / 14)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/migrate-to-user-level.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking for project-level hook migration..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/surface-orphan-codex-branches.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking for orphan claude/* branches..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/surface-stranded-session-artifacts.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking worktrees for stranded session artifacts..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/surface-orphan-worktree-snapshots.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Surfacing recoverable worktree snapshots..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/worktree-footprint-signal.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking worktree + disk footprint..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/warn-vault-session-in-worktree.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Vault-in-worktree tripwire (loud abort-and-relaunch)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/surface-backup-status.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking off-machine backup..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/enforce-worktree-cap.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Enforcing worktree cap (reclaim-then-allow)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/remediate-runaway-procs.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Reaping orphaned runaway processes..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/context-budget-measure.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Measuring always-loaded context budget..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/surface-connector-liveness.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking connectors for the silent-empty (0-vs-0) gap..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/relocate-watch-surface.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking for vault-relocation drift (old-path recreators)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/dev-hub-refresh-on-session-start.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'"
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/surface-deployed-hooks-behind.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Checking deployed hooks match what was pulled (deploy-fails-open drift)..."
+          },
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/scripts/heal-journal-guard.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Self-healing the /journal Step-0 context guard (registration + vault preflight)..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/remove-ended-worktree.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'",
+            "statusMessage": "Removing ended session worktree (committed + unsaved work preserved)..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '[VAULT_PATH]/⚙️ Meta/scripts/write-hook.sh'",
+            "statusMessage": "Checking write triggers..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Edit|Write|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[PYTHON] ~/plugins/codex-brain-starter/hooks/post-tool-use-learnings.py 2>/dev/null || echo '{\"continue\":true,\"suppressOutput\":true}'"
+          }
+        ]
+      }
+    ]
+  },
+  "_how_to_update": "After git pull on this repo (or automatically, every ~6 days, via the auto-update UserPromptSubmit hook), scripts/ai-brain-auto-update.py (cross-platform; the .sh is a thin delegator for old wirings) fast-forwards ~/plugins/codex-brain-starter, runs scripts/sync-skills.py (skill content backup + overwrite), and then runs scripts/install-hooks-user-level.py ITSELF (bounded) to rewire ~/.codex/settings.json — the deploy no longer waits on Codex to run it, so a merged PR reaches the machine the same session (MYC-720). On Windows the installer rewrites these POSIX commands into the portable hook_runner form (see scripts/PORTABILITY.md section 5). The pull is ff-only: a divergent or dirty checkout is refused and surfaced for manual merge, never given a surprise merge commit. If the auto path is bypassed (pinned via ~/.codex/.ai-brain-starter-pinned, network down, hook disabled), re-run scripts/install-hooks-user-level.py or the bootstrap manually — both call the installer with --fail-on-missing so divergent-fork strands surface loudly."
+}

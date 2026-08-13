@@ -1,0 +1,146 @@
+{
+  "language": "en",
+  "_comment": "English closing signals. Patterns are Python regex with case-insensitive matching. The hook compiles them with re.IGNORECASE | re.MULTILINE. Per-user tuning in AGENTS.md: 'closingSignals.custom' ADDS always-fire phrases; 'closingSignals.suppress' SUBTRACTS never-fire phrases (overrides packs); 'closingSignals.customOnly: true' fires ONLY on custom and skips these shared tiers (deliberate-close-only).",
+
+  "explicit": [
+    "^/(close|wrap-?up|bye|done|finish)\\b",
+    "(?:^|\\s)/(close|wrap-?up|bye|done|finish)\\b"
+  ],
+
+  "high_confidence": [
+    "^(ok(ay)?[,.\\s]+)?bye\\b",
+    "^(ok(ay)?[,.\\s]+)?bye!*$",
+    "\\bgood ?night\\b",
+    "\\bttyl\\b",
+    "\\bcya\\b",
+    "\\bsee ya\\b",
+    "\\bsigning off\\b",
+    "\\bcatch you (later|tomorrow)\\b",
+    "\\btalk (to you )?(later|tomorrow|soon)\\b",
+    "\\bwrapping (up|it up)\\b",
+    "\\bwrap\\s+(this|it)\\s+up\\b",
+    "\\b(let'?s\\s+)?close\\s+(this|the|out|up)\\s+session\\b",
+    "\\b(let'?s\\s+)?close\\s+(this|the)\\s+session\\b",
+    "\\b(let'?s\\s+)?close\\s+(out|up|down)\\s+(this|the)\\s+session\\b",
+    "\\b(let'?s\\s+)?(end|finish)\\s+(this|the)\\s+session\\b",
+    "\\bclose\\s+(it|us|this|that)\\s+(out|up|down)\\b",
+    "\\bend\\s+for\\s+(today|now|the\\s+day)\\b",
+    "\\bcalling it (a (day|night))\\b",
+    "\\bthat'?s? (all|it) for (today|now)\\b",
+    "\\bthanks?,? that'?s? (all|it)\\b",
+    "\\bi'?m (out|done|good)[.!?\\s]*$",
+    "^(ok(ay)?[,.\\s]+)?done\\s+for\\s+(today|now|the\\s+day)[!.\\s]*$",
+    "^(ok(ay)?[,.\\s]+)?(thanks|thx|ty)[,!.\\s]*$",
+    "\\blater[!.\\s]*$",
+    "^later$",
+    "^bye+$",
+    "^k(ay)? bye\\b",
+    "^k(ay)? thx\\b",
+    "^k thanks\\b",
+    "\\bsee you (later|tomorrow|soon)\\b",
+    "\\bgnight\\b",
+    "\\bgn$",
+    "^gn[!.\\s]*$"
+  ],
+
+  "ambiguous": [
+    "^ok(ay)?[!.\\s]*$",
+    "^cool[!.\\s]*$",
+    "^great[!.\\s]*$",
+    "^perfect[!.\\s]*$",
+    "^nice[!.\\s]*$",
+    "^sounds good[!.\\s]*$",
+    "^awesome[!.\\s]*$"
+  ],
+
+  "emoji_only": [
+    "^[\\s]*👋[\\s]*$",
+    "^[\\s]*🙏[\\s]*$",
+    "^[\\s]*✌️?[\\s]*$",
+    "^[\\s]*🫡[\\s]*$",
+    "^[\\s]*💤[\\s]*$"
+  ],
+
+  "false_positive_guards": [
+    {
+      "_comment": "Don't match 'bye' inside quotes — user is asking how to say bye",
+      "pattern": "[\"'`].*\\bbye\\b.*[\"'`]"
+    },
+    {
+      "_comment": "Don't match 'say bye to X' — user is referring to losing something",
+      "pattern": "\\bsay\\s+(good)?bye\\s+to\\b"
+    },
+    {
+      "_comment": "Don't match inside code fences",
+      "pattern": "```[\\s\\S]*?\\b(bye|done|ttyl|later)\\b[\\s\\S]*?```"
+    },
+    {
+      "_comment": "Don't match 'try again later' / 'try later' — common in error messages pasted as content, not a sign-off",
+      "pattern": "\\btry\\s+(it\\s+|again\\s+)?later\\b"
+    },
+    {
+      "_comment": "Don't match 'X later' inside indented / quoted blocks (4-space or > prefix) — pasted error text or quoted message",
+      "pattern": "(^|\\n)(?:    |>\\s).*\\blater\\b"
+    },
+    {
+      "_comment": "Don't match 'done with X' — user describing state, not closing",
+      "pattern": "\\bdone\\s+with\\s+\\w+"
+    },
+    {
+      "_comment": "Don't match 'ok let's' / 'ok now' / 'ok so' — user transitioning, not closing",
+      "pattern": "^ok(ay)?[,.\\s]+(let'?s|now|so|next|continue|keep)\\b"
+    },
+    {
+      "_comment": "Don't match meta-questions about close signals ('what does ttyl mean?')",
+      "pattern": "\\b(what|how|why|when|where|who|define|explain|mean[s]?|stand[s]?\\s+for)\\b.{0,40}\\b(bye|ttyl|cya|gn|done|wrapping|signing\\s+off)\\b"
+    },
+    {
+      "_comment": "Don't match question-form prompts ending in '?'",
+      "pattern": "\\b(bye|ttyl|cya|done|good\\s+night|wrapping|signing\\s+off)\\b[^?]*\\?\\s*$"
+    }
+  ],
+
+  "_strict_guards_comment": "STRICT guards override ALL tiers (including explicit + high_confidence). Use only for unambiguous non-close contexts where false positives are very costly. Codified 2026-05-25 after 139 empty session stubs accumulated from meta-discussion of close cascade matching high_confidence patterns.",
+  "strict_guards": [
+    {
+      "_comment": "Meta-discussion / debugging of the close cascade itself ('why does the session keep firing', 'fix close session', 'diagnose why sessions auto archive').",
+      "pattern": "\\b(why|how|when|fix|diagnose|debug|stop|prevent|disable|broken|wrong|bug|issue|problem|trace|inspect|hook|regex|cascade|firing|trigger|over[\\s-]?fire|over[\\s-]?match|false[\\s-]?positive)\\b.{0,80}\\b(close|archiv|wrap|end|finish)\\b.{0,80}\\b(session|cascade|stub|hook|sessions|markers?)\\b"
+    },
+    {
+      "_comment": "User describing the bug pattern ('sessions keep auto archiving', 'sessions are getting created', 'session keeps firing').",
+      "pattern": "\\bsessions?\\s+(keep|kept|are|is|got|getting|auto|wrongly|always|never|won'?t|don'?t|fir(e|ing)|trigger|create|writ)"
+    },
+    {
+      "_comment": "Backtick/quote-wrapped technical references to close phrases (regex/code/script content).",
+      "pattern": "[`].*\\b(close\\s+(this|the|out|up)\\s+session|bye|ttyl|cya)\\b.*[`]"
+    },
+    {
+      "_comment": "'close out X session' where X is a noun other than this/the (database session, customer session, narrative session, etc.).",
+      "pattern": "\\bclose\\s+(out\\s+|up\\s+|down\\s+)?(my\\s+|the\\s+|a\\s+|that\\s+|each\\s+|every\\s+|some\\s+)?(database|db|customer|client|user|narrative|book|chapter|writing|coaching|terminal|browser|tab|ssh|http|tcp|websocket|connection|stream|pipe|file|tmux|screen|repl|debug|debugger|gdb|lldb|trade|deal|loan|case|ticket|chat|conversation|interview|meeting|class|panel|story|scene)\\s+session"
+    },
+    {
+      "_comment": "Prompt is clearly a question / request about closing behavior rather than a sign-off itself (auto archiv|keep firing|keep creating|keep writing).",
+      "pattern": "\\b(auto[\\s-]?archiv|keep\\s+firing|keep\\s+creating|keep\\s+writing|over[\\s-]?firing|over[\\s-]?triggering|spurious|false[\\s-]?positive|extra\\s+stubs?|empty\\s+stubs?)\\b"
+    },
+    {
+      "_comment": "Meta-DEFINITION: a close-signal NOUN PHRASE ('session close', 'close signal', 'closing cascade') immediately tied to is/isn't/means/counts-as/should — the user is DEFINING what counts as a close, not issuing one ('session close isn't ...', 'the close signal means ...'). Codified 2026-06-19 (MYC-1266) after a definitional message containing the literal custom phrase fired the explicit tier. Tight noun+verb adjacency so a genuine imperative close ('lets close this session', 'start closing cascade') is NOT suppressed.",
+      "pattern": "\\b(session\\s+close|close\\s+signal|closing\\s+signal|closing\\s+cascade|close\\s+trigger|close\\s+phrase)\\b.{0,40}\\b(is\\s?n'?t|are\\s?n'?t|is\\s+not|means?|counts?\\s+as|should|shouldn'?t|do\\s?n'?t)\\b"
+    },
+    {
+      "_comment": "Meta-DEFINITION: 'isn't / is not / don't (count) ... a close|closing signal|trigger|phrase|command' — describing what is or isn't a close trigger. Requires the explicit 'close/closing <signal-word>' phrase so 'this isn't working, end the session' (a genuine close) is NOT caught.",
+      "pattern": "\\b(is\\s?n'?t|are\\s?n'?t|is\\s+not|are\\s+not|do\\s?n'?t|does\\s?n'?t)\\b.{0,40}\\b(a\\s+|the\\s+|my\\s+)?(close|closing|session[\\s-]?close)\\s*(signal|trigger|phrase|command|cascade|word)\\b"
+    },
+    {
+      "_comment": "Meta-ENUMERATION: 'anything other than ...' / 'the only close|closing|valid|way|phrase|trigger|thing ...' near a close/session/cascade word — listing the ONLY valid triggers, not issuing one ('anything other than \"close this session\"'). A genuine close never says 'anything other than'.",
+      "pattern": "\\b(anything\\s+other\\s+than|other\\s+than|the\\s+only\\s+(close|closing|valid|way|phrase|trigger|thing))\\b.{0,120}\\b(close|closing|cascade|session)\\b"
+    },
+    {
+      "_comment": "Meta-QUESTION about a close word — 'what does ttyl mean?', 'how do I say bye?', 'what's an example of a sign-off?'. Asking ABOUT a close phrase is referenced content, never a close itself. Promoted to strict because the weak-tier meta-question FP guard does NOT override a high_confidence match on the bare close word. MYC-1266 (same family as the definitional guards above).",
+      "pattern": "\\b(what|how|why|when|where|who|define|defines|explain|mean[s]?|spell[s]?|example\\s+of|stand[s]?\\s+for)\\b.{0,40}\\b(bye|ttyl|cya|gn|good\\s*night|wrapping|signing\\s+off|sign[\\s-]?off|close\\s+(this|the|out|up)\\s+session|closing\\s+cascade)\\b"
+    },
+    {
+      "_comment": "INTERROGATIVE about whether a close ALREADY happened — 'did you close this session?', 'have you closed the session?', 'is the session closed?'. A question ABOUT the close action's state/completion, not a request to perform it. Requires a STATE/PAST auxiliary (did/do/does/have/has/had/is/are/was/were) + subject + a close verb + a trailing '?'. Modal REQUESTS ('can/could/would/will you close this session?') carry no such auxiliary, so they still fire. Codified 2026-06-30 after 'did you close this session?' fired the full cascade via the high_confidence 'close (this|the) session' pattern; strict tier is required because false_positive_guards do NOT override a high_confidence match.",
+      "pattern": "\\b(did|do|does|have|has|had|is|are|was|were)\\s+(you|we|i|it|the|this|that|everything|already)\\b[^?\\n]{0,45}\\bclos(?:e|ed|ing)\\b[^?\\n]{0,45}\\?"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+name: behavioral-install-eval
+
+# Weekly behavioral eval of the install surface (MYC-419).
+#
+# The static text-presence guard (test_trust_prompt_preframing.sh, in the
+# per-PR ci gate) asserts the README CONTAINS the install directives. This
+# workflow asserts they WORK: a fresh model handed README.md must commit to
+# RUNNING the install as its next action — not a menu, not a confirmation
+# stall, not a /plugin-only partial, not "let me review the script first".
+# A negative-control fixture (caution-primed menu README) must FAIL the same
+# bar, proving the harness detects the failure class.
+#
+# Scheduled weekly + manual dispatch, NOT per-PR: it spends real Anthropic
+# API calls and measures doc behavior, not diffs (eval-gates-in-ci pattern:
+# periodic tier). ~6 sonnet/haiku calls per run; negligible cost.
+#
+# The eval script exits 2 (loud INFRA error) when ANTHROPIC_API_KEY is
+# missing or empty, so a dead repo secret can never read as a green skip.
+#
+# No untrusted user input is referenced in any run: command (schedule +
+# manual dispatch only; inputs are repo-tracked files).
+
+on:
+  schedule:
+    - cron: '0 14 * * 1'   # Mondays 14:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    name: fresh model vs README (install behavior)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: install anthropic sdk
+        run: python3 -m pip install anthropic
+      - name: run behavioral install eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 tests/eval/behavioral_install_eval.py

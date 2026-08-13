@@ -1,0 +1,49 @@
+name: Codex port CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify Codex package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run structural verification
+        run: python scripts/verify_codex_port.py
+      - name: Run Codex integration tests
+        run: python -m unittest discover -s tests/codex -p "test_*.py" -v
+      - name: Exercise installer without writes
+        run: python scripts/install_codex_plugin.py --dry-run
+
+  windows:
+    name: Verify Windows entry points
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Parse PowerShell installer
+        shell: powershell
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\bootstrap.ps1),
+            [ref]$null,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { throw ($errors | Out-String) }
+      - name: Exercise installer without writes
+        run: python scripts/install_codex_plugin.py --dry-run
+

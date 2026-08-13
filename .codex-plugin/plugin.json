@@ -1,0 +1,36 @@
+{
+  "name": "codex-brain-starter",
+  "version": "1.0.0",
+  "description": "Build and operate an AI-powered Obsidian second brain with Codex-native skills, lifecycle hooks, and an optional Health MCP server.",
+  "author": {
+    "name": "Mycelium AI",
+    "url": "https://github.com/mycelium-hq"
+  },
+  "homepage": "https://github.com/juholaan/codex_brain",
+  "repository": "https://github.com/juholaan/codex_brain",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "obsidian",
+    "second-brain",
+    "knowledge-graph",
+    "journaling",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex Brain Starter",
+    "shortDescription": "Build and run an Obsidian second brain",
+    "longDescription": "Codex-native workflows for setting up an Obsidian vault, journaling, extracting meeting actions, generating insights, maintaining knowledge graphs, and optionally querying health data through MCP.",
+    "developerName": "Mycelium AI",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/juholaan/codex_brain",
+    "defaultPrompt": [
+      "Use $setup-brain to set up my Obsidian second brain.",
+      "Use $daily-journal to guide today's journal entry.",
+      "Use $insights to find patterns in my recent journal entries."
+    ]
+  }
+}

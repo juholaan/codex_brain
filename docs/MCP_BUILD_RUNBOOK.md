@@ -1,0 +1,374 @@
+# MCP Build Runbook
+
+> **READ THIS WHOLE FILE BEFORE BUILDING ANY MCP SERVER, MANAGED AGENT, OR CUSTOM CONNECTOR.**
+>
+> This applies to: building new MCPs, modifying existing ones, deploying managed agents, debugging MCP connection failures, or planning MCP architecture.
+>
+> This runbook captures every lesson from MCP builds so you never re-learn them. Every numbered lesson is load-bearing.
+
+---
+
+## PRE-FLIGHT CHECKLIST (run before every MCP build)
+
+1. **Read this whole file.** Every skipped lesson costs 15-60 minutes.
+2. **Check your tool-routing doc** before building. Does an existing paid tool already do this? (n8n, HubSpot, Apollo, etc.) Don't build custom when you can wire.
+3. **Run the Optimization Pass** (see section below). Before writing a line of code, audit the spec for over-engineering and stack redundancy. This is mandatory, not optional.
+4. **Verify FastMCP is installed:** `fastmcp version` (expect v3.2.3+). Install via `pipx install fastmcp`.
+5. **Check `~/.codex/config.toml`** for existing registrations. Don't create duplicates.
+6. **Check Python dependencies:** `python3 -c "import fastmcp; print(fastmcp.__version__)"`. If import fails: `pip3 install --break-system-packages fastmcp`.
+7. **Read at least one existing MCP server** to match established patterns before writing new ones.
+
+---
+
+## OPTIMIZATION PASS (mandatory before every build)
+
+Run this audit on your spec before writing any code. The goal: build only what genuinely needs to be built, at the right complexity level.
+
+### 1. Stack redundancy check
+
+For every component in the spec, ask: does an existing paid tool handle this already?
+
+| Spec says | Check this first |
+|----------|-----------------|
+| Dashboard / reporting UI | Native tool reporting, Google Sheets |
+| Scheduling / cron | n8n workflows, Codex scheduled tasks |
+| Email sending | Existing email tool sequences |
+| CRM data | Already-connected CRM (HubSpot, etc.) |
+| File classification | Rules-based Python — no Codex API needed |
+| Web scraping | Playwright or existing browser plugin |
+| Document storage | Vault files — no new DB needed |
+
+### 2. Frontend complexity check
+
+Most internal tools don't need a full React stack. Before building Next.js + a component library:
+
+- **Is the only user you?** If yes: terminal output, a Google Sheet, or a simple HTML page is sufficient.
+- **Is it purely internal operations?** A Slack bot or terminal output is often enough.
+- **Does it need real-time updates?** If not, static HTML + a cron refresh is simpler.
+- **Rule:** Next.js is justified only when the tool has external users, complex interactivity, or is being published publicly.
+
+### 3. Database size check
+
+Before reaching for Postgres/Supabase:
+- Weekly snapshots for 90 days = 52 rows. That's SQLite.
+- Contacts at typical scale = hundreds of rows. That's SQLite.
+- Supabase/Postgres is justified only when: multi-user concurrent writes, >100k rows, or cross-service DB access.
+
+### 4. LLM usage check
+
+Not everything needs Codex. Flag and remove LLM calls where:
+- The logic is purely rule-based (file classification, field mapping, regex extraction)
+- The output is deterministic math (totals, calculations)
+- The operation is just format conversion (JSON to markdown, YAML parsing)
+- **Rule:** Codex API calls add latency and cost. Use only where the LLM is genuinely making a judgment call.
+
+### 4b. Financial math goes in Excel — not Python, not LLM
+
+Any agent that outputs money amounts (invoices, commissions, budgets, tax calculations) must generate an Excel file with formulas. Excel's engine does the math. Python only writes input values and formula strings.
+
+- Use `openpyxl` — formula strings like `"=B3*0.11"` are written as cell values
+- The spreadsheet is the auditable source of truth; JSON/dict output is a summary
+- Add `openpyxl>=3.1.0` to any requirements.txt that handles financial output
+
+### 5. Cross-agent shared code
+
+When building multiple agents in the same session, look for shared patterns to extract:
+- Anthropic client setup with prompt caching
+- Error handling and retry logic
+- Vault write helpers
+- Common data models
+- **Rule:** If two agents share >20 lines of logic, extract to a shared `utils.py`.
+
+### 6. Integration with existing MCPs
+
+Check if a new agent should call an already-built MCP instead of re-implementing:
+- **Rule:** Agents and MCPs should compose, not duplicate.
+
+### Document your optimization decisions
+
+In your build log entry, note:
+- What you simplified vs the spec
+- What you decided NOT to build (and why)
+- Any shared code extracted
+
+---
+
+## ARCHITECTURE RULES
+
+### MCP Server Pattern (FastMCP)
+
+```python
+from fastmcp import FastMCP
+
+mcp = FastMCP("your-server-name")
+
+@mcp.tool()
+def your_tool(param: str) -> dict:
+    """Tool description shown to Codex."""
+    return {"result": param}
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+- **Framework:** FastMCP v3.2.3+ (Python, decorator-based)
+- **Transport:** stdio (registered in `~/.codex/config.toml`)
+- **Location:** `~/Desktop/{name}-mcp/` (each server gets its own directory)
+- **Files:** `server.py` (main), `requirements.txt`, `config.yaml` (if needed)
+
+### Managed Agent Pattern (Anthropic SDK)
+
+```python
+import anthropic
+import os
+
+MODEL = "claude-sonnet-4-6"
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        key = os.environ.get("ANTHROPIC_API_KEY")
+        if not key:
+            return None  # return None, don't crash
+        _client = anthropic.Anthropic(api_key=key)
+    return _client
+```
+
+Key rules:
+- **Always lazy-initialize** the Anthropic client — never at module level
+- **Always stub gracefully** when no API key is set — return a hardcoded example, don't crash
+- **Use prompt caching** on system prompts: `{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}`
+- **Model:** `claude-sonnet-4-6` unless you need a cheaper/faster option
+
+### Registration
+
+```bash
+# Register MCP server (user-level, loads everywhere including worktrees)
+codex mcp add your-server-name -s user -- python3 /path/to/server.py
+
+# Verify registration
+cat ~/.codex/config.toml | python3 -c "import json,sys; print(list(json.load(sys.stdin).get('mcpServers',{}).keys()))"
+```
+
+After registration: **restart Codex** to load new MCP tools.
+
+### Data Patterns
+
+- **SQLite** for queryable structured data (contacts, logs, events)
+- **Vault files** as source of truth for Obsidian content — use `python-frontmatter` to read
+- **os.walk(followlinks=True)** for vault traversal — never `Path.rglob()` (see Lesson #10)
+- **Wikilinks:** Always bare filenames, never path-form: `[[Note Name]]` not `[[folder/Note Name]]`
+
+---
+
+## COMMON PITFALLS
+
+### datetime.utcnow() is deprecated
+
+```python
+# WRONG — deprecated in Python 3.12, removed in 3.14
+from datetime import datetime
+datetime.utcnow()
+
+# CORRECT
+from datetime import datetime, timezone
+datetime.now(timezone.utc)
+```
+
+### Dict access on external data
+
+```python
+# WRONG — crashes if key missing
+f['rating']
+
+# CORRECT — safe with fallback
+f.get('rating', 'N/A')
+```
+
+### Module-level Anthropic client crashes when no API key
+
+```python
+# WRONG — crashes at import time if no key
+client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+# CORRECT — lazy init, graceful if missing
+_client = None
+def _get_client():
+    global _client
+    if _client is None:
+        key = os.environ.get("ANTHROPIC_API_KEY")
+        if not key:
+            return None
+        _client = anthropic.Anthropic(api_key=key)
+    return _client
+```
+
+### macOS symlinks silently skipped by rglob
+
+```python
+# WRONG — silently misses symlinked directories (e.g. team vault symlinks)
+for f in Path(vault_root).rglob("*.md"):
+    ...
+
+# CORRECT
+import os
+def _walk_md_files(root):
+    for dirpath, _, filenames in os.walk(str(root), followlinks=True):
+        for fname in filenames:
+            if fname.endswith(".md"):
+                yield Path(dirpath) / fname
+```
+
+---
+
+## LESSONS LOG
+
+### Lesson #1: Background agents can't get interactive permission approvals
+**Rule:** Never use background agents for tasks that require file creation (Bash, Write). Build directly in the main session. Background agents work for read-only research but not for builds.
+
+### Lesson #2: Worktree isolation blocks MCP access
+**Rule:** Don't use worktree isolation for MCP builds. Each MCP lives in its own directory outside the repo anyway. Use regular agents or build directly.
+
+### Lesson #3: Embed context in agent prompts, don't reference external tools
+**Rule:** When delegating to agents, embed ALL needed context directly in the prompt. Never tell an agent to "go read X from MCP Y." Pre-read it and paste the relevant sections.
+
+### Lesson #4: Agents with vault access produce better servers than rushed direct builds
+**Rule:** When an agent CAN get permissions (foreground, non-worktree), let it read the actual data. It will produce context-aware code. For background builds, build directly since permissions block.
+
+### Lesson #5: Install dependencies system-wide before testing
+**Rule:** After creating server files, immediately install all requirements and run an import test: `python3 -c "import server; print('OK')"`. Don't wait to discover import errors.
+
+### Lesson #6: Agent-built servers may use different dependencies than specified
+**Rule:** After an agent builds/modifies a server, re-read requirements.txt and verify the import test still passes.
+
+### Lesson #7: Register MCPs in ~/.codex/config.toml for universal loading
+**Rule:** Use `codex mcp add name -s user -- python3 /path/to/server.py` to register at the user level. This loads in all sessions including worktrees. Project-level `.codex/config.toml` may not load in worktree sessions.
+
+### Lesson #8: Always run the Optimization Pass before writing code
+**Rule:** Before writing any code, run the Optimization Pass. Kill unnecessary frontends for internal-only tools. Use SQLite until Postgres is genuinely needed. Remove LLM calls from deterministic operations.
+
+### Lesson #9: Never use Python or LLM for financial math — use Excel formulas
+**Rule:** Any agent that produces financial output must generate an Excel file using `openpyxl` with formulas in the cells. Excel's formula engine does the math. Python only writes input values and formula strings.
+
+### Lesson #10: macOS symlinks are silently skipped by Python's rglob
+**Rule:** Never use `Path.rglob()` on directories that may contain symlinks. Use `os.walk(root, followlinks=True)`.
+
+### Lesson #11: Always check actual frontmatter field values before writing filters
+**Rule:** Before writing any frontmatter filter config, sample actual values from the vault to verify they match what you expect.
+
+### Lesson #12: Verify vault folder paths exist before referencing them
+**Rule:** Before adding any path to a sync rule or config, verify it exists with `ls`.
+
+### Lesson #13: Wire agents to real data sources — don't ship stubs
+**Rule:** When building an agent that depends on data from an already-built MCP, read that MCP's source and wire to it directly. Stubs are acceptable only for services not yet built. Flag all stubs with `# STUB — replace with {service name}`.
+
+### Lesson #14: Google Workspace calendar tools require explicit UTC offset in datetime strings
+**Rule:** Pass datetime strings with an explicit offset (`2026-04-20T09:30:00-05:00`), not naive strings (`2026-04-20T09:30:00`). The `time_zone` parameter sets display timezone only; it does not shift naive datetimes. Naive strings are treated as UTC, placing events hours early for users in negative-offset zones. Always compute and append the correct UTC offset before calling `cal_create_event` or `cal_update_event`.
+
+---
+
+## SELF-TEST PROTOCOL
+
+Every MCP server and managed agent must pass a self-test before being considered done:
+
+```python
+# At the bottom of server.py or agent.py
+if __name__ == "__main__":
+    # If called directly (not via MCP), run self-test
+    import inspect
+    if "mcp" in inspect.signature(mcp.run).parameters:
+        mcp.run()
+    else:
+        self_test()
+```
+
+Self-test requirements:
+1. Must not crash when `ANTHROPIC_API_KEY` is not set (graceful stub output)
+2. Must exercise every tool/function at least once
+3. Must print clear pass/fail indicators
+4. Must end with `print("Self-test complete.")` and exit 0
+
+---
+
+## POST-BUILD: GITHUB PUBLISHING CHECKLIST
+
+Once an MCP is tested and working, publish it as a standalone GitHub repo:
+
+1. **Strip personal data.** Remove: vault paths, contact names, company-specific config, API tokens, personal anecdotes. Replace with generic examples and env var placeholders.
+2. **Create GitHub repo:** `gh repo create yourusername/{name}-mcp --public --description "..."`
+3. **Standard files:** README.md, LICENSE (MIT), requirements.txt, server.py or agent.py, .env.example
+4. **README must include:** one-line description, install instructions, Codex registration snippet, tool list with descriptions, config examples
+5. **Test install from scratch:** clone into a temp dir, install deps, run import test, register in .claude.json, verify tools appear in Codex
+6. **Tag a release:** `git tag v1.0.0 && git push --tags`
+
+---
+
+## WHICH AGENTS ARE WORTH PUBLISHING?
+
+Publish if: the core logic is universal (not company-specific), it composes with common tools (Obsidian, Google Drive, HubSpot), and the config is externalizable via env vars.
+
+| Agent type | Publish? | Notes |
+|-----------|---------|-------|
+| Vault file classifier/syncer | Yes | Anyone with Google Drive + Obsidian wants this |
+| Meeting action item extractor | Yes | Generalize owner list to config file |
+| Knowledge graph auto-tagger | Yes | Companion to graphify — same audience |
+| Graph State of the Union | Yes | Useful to anyone running graphify quarterly |
+| Invoice generator (with local tax law) | No | Tax rules are country-specific |
+| Business-specific pipeline | No | Too narrow without heavy reconfiguration |
+
+
+---
+
+## LESSONS FROM DEBUGGING (2026-04-16)
+
+### Lesson: Valid MCP transport types are `stdio`, `sse`, `http` — never `url`
+
+If you set `"type": "url"` in `.codex/config.toml`, Codex silently drops the ENTIRE file from `codex mcp list`. No warning, no error. The file appears to be ignored; in reality the schema validator rejects it whole when one entry is malformed.
+
+**Fix:** Use `"type": "http"` with a `"url"` field. Example:
+
+```json
+{
+  "mcpServers": {
+    "my-http-server": {
+      "type": "http",
+      "url": "https://example.com/mcp"
+    }
+  }
+}
+```
+
+**Verify after every .codex/config.toml edit:** run `codex mcp list`. If servers disappear, diff against working marketplace examples in `~/.codex/plugins/marketplaces/claude-plugins-official/external_plugins/*/.codex/config.toml`.
+
+### Lesson: `fastmcp run` uses the pipx venv, not system Python
+
+`fastmcp` installed via `pipx install fastmcp` runs server scripts under its OWN isolated Python. Any import in your server file must be installed INTO that venv:
+
+```bash
+# Option A: pipx inject
+pipx inject fastmcp networkx pandas
+
+# Option B: direct pip into the venv
+~/.local/pipx/venvs/fastmcp/bin/python3 -m pip install networkx
+```
+
+System-wide `pip3 install` does nothing for `fastmcp run ...`-hosted servers.
+
+**Symptoms:** `codex mcp list` shows `✗ Failed to connect` for your server. Running `fastmcp run /path/to/server.py` manually shows `ModuleNotFoundError`.
+
+**Debug command:**
+```bash
+fastmcp run /path/to/your/server.py
+# Watch stderr for ModuleNotFoundError
+```
+
+### Lesson: `codex mcp reset-project-choices` when trust state gets stuck
+
+If `.codex/config.toml` entries appear unapproved even after restarts, the trust store may have cached a rejection. Run:
+
+```bash
+codex mcp reset-project-choices
+```
+
+Then restart Codex in the project dir. You will get a fresh trust dialog for all project-scoped servers.

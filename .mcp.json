@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "health": {
+      "command": "codex-brain-health-mcp",
+      "enabled": false
+    }
+  }
+}

@@ -1,0 +1,59 @@
+.DS_Store
+*.swp
+*.swo
+*~
+node_modules/
+__pycache__/
+.venv/
+**/.venv/
+*.bak
+.sync.log
+
+# Secrets: never commit these.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+*.p12
+secrets.json
+.zsh_secrets
+
+# Local Claude Code overrides (contains user-specific permissions).
+.claude/settings.local.json
+
+# Closed-loop learning state (per-vault, regenerated automatically).
+.promote-state.json
+
+# Per-clone drift-check personal-pattern list (use .driftignore.example as starting point).
+.driftignore
+
+# health-mcp local DuckDB (user health data, never commit).
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+**/health-mcp-extract/
+
+# codegraph local index (per-clone, 100MB+, regenerated on demand).
+.codegraph/
+
+# scan-prior-sessions-for-secrets.py runtime state (markers + single-instance
+# lock, regenerated each run; never belongs in version control).
+hooks/.last-secret-scan
+hooks/.last-secret-scan-full
+hooks/.secret-scan.lock
+
+# Stray vault "Meta" folders left by local sync / resolver runs against a real
+# vault (e.g. a script writing "⚙️ Meta/logs/"). Never ship a user's vault
+# folder into this public substrate repo.
+/⚙️ Meta/
+/Meta/
+
+# Same hazard, WhatsApp export side: scripts/whatsapp/sync.mjs defaults
+# VAULT_ROOT to two levels up from itself, which inside this repo resolves to
+# the REPO ROOT, not a vault. Running it without VAULT_ROOT set therefore writes
+# personal chat transcripts here. Credentials (baileys_auth/, baileys_store.json)
+# are already ignored; this covers the exported message content too, so a user
+# can never stage their own WhatsApp history into a public fork.
+/🤖 AI Chats/
